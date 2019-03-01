@@ -1,0 +1,994 @@
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 1
+lib.asm
+
+
+
+      1	0000			     .model tiny
+      2
+      3				     ;	 Machine constants
+      4
+      5	      =B800		     VIDEO_MEM	= 0b800h
+      6	      =0050		     CONS_WIDTH	=    80d
+      7	      =000E		     LAST_LINE	=    14d
+      8
+      9				     ;	 Local constants
+     10
+     11	      =00B0		     chr_fill  = 0B0h
+     12	      =0000		     chr_empty = 000h
+     13
+     14	      =000F		     clr_white = 00Fh ;	white
+     15
+     16	      =0010		     tbl_IN    = 010h ;	blue
+     17	      =000F		     txt_IN    = clr_white
+     18	      =0030		     tbl_BD    = 030h ;	cyan
+     19	      =000F		     txt_BD    = clr_white
+     20
+     21	      =00C9		     tbl_LU    = 0c9h
+     22	      =0058		     tbl_RU    = 'X' ; 0bbh `
+     23	      =00C8		     tbl_LD    = 0c8h
+     24	      =00BC		     tbl_RD    = 0bch
+     25
+     26	      =00CD		     tbl_H     = 0cdh
+     27	      =00BA		     tbl_V     = 0bah
+     28
+     29	      =0002		     num_CLR   =  02h ;	green
+     30	      =000D		     col_width =  13d
+     31
+     32	0000			     .code
+     33
+     34				     public makeFrame
+     35				     public printDec
+     36				     public printBin
+     37				     public printHex
+     38				     public getDec
+     39				     public getBin
+     40				     public getHex
+     41
+     42				     public var_check
+     43	0000			     var_check proc _a,	_b, _c
+     44	0000  55			 push bp
+     45	0001  8B EC			 mov bp, sp
+     46
+     47					 ; es -> video memory
+     48	0003  B8 B800			 mov ax, VIDEO_MEM
+     49	0006  8E C0			 mov es, ax
+     50
+     51	0008  8B 46 04			 mov ax, _a
+     52	000B  B4 4E			 mov ah, 04Eh
+     53
+     54	000D  AB			 stosw
+     55
+     56	000E  5D			 pop bp
+     57	000F  C3			 ret
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 2
+lib.asm
+
+
+
+     58	0010				 endp
+     59
+     60				     ;HHH=================================================HHH
+     61				     ;HHH						  HHH
+     62				     ;HHH		    makeFrame			  HHH
+     63				     ;HHH - make a simple frame	with standart messages	  HHH
+     64				     ;HHH						  HHH
+     65				     ;HHH   INPUT: stack: > x	    (position x)	  HHH
+     66				     ;HHH		    y	    (position y)	  HHH
+     67				     ;HHH		    width   (frame size	x)	  HHH
+     68				     ;HHH		    height  (frame size	y)	  HHH
+     69				     ;HHH  OUTPUT: --					  HHH
+     70				     ;HHH DESTROY: AX, BX, CX, DX			  HHH
+     71				     ;HHH	   SI, DI, ES				  HHH
+     72				     ;HHH						  HHH
+     73				     ;HHH=================================================HHH
+     74
+     75	0010			     makeFrame proc
+     76	0010  55			 push bp
+     77	0011  8B EC			 mov bp, sp
+     78
+     79					 ;	x = [bp	+ 4]
+     80					 ;	y = [bp	+ 6]
+     81					 ;  width = [bp	+ 8]
+     82					 ; height = [bp	+ 10]
+     83
+     84					 ;---------------------------------------------
+     85
+     86				     ; FILLING
+     87
+     88					 ; es -> video memory
+     89	0013  B8 B800			 mov ax, VIDEO_MEM
+     90	0016  8E C0			 mov es, ax
+     91
+     92					 ; di -> LU corner (in)
+     93	0018  8B 46 06			     mov ax, [bp + 6]	 ;
+     94	001B  40			     inc ax		 ;
+     95	001C  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	(y + 1)	* CONS_WIDTH
+     96	001F  F7 E2			     mul dx		 ;
+     97
+     98	0021  03 46 04			     add ax, [bp + 4]	 ;
+     99	0024  40			     inc ax		 ; ax += x + 1
+    100
+    101	0025  D1 E0			     shl ax, 1		 ; ax *= 2
+    102	0027  8B F8			 mov di, ax
+    103
+    104					 ; si <=> current y position
+    105	0029  BE 0000			 mov si, 0
+    106
+    107					 ; cx =	width -	2
+    108	002C  8B 4E 08			 mov cx, [bp + 8]
+    109	002F  83 E9 02			 sub cx, 2
+    110
+    111					 ; bx =	height - 2
+    112	0032  8B 5E 0A			 mov bx, [bp + 10]
+    113	0035  83 EB 02			 sub bx, 2
+    114
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 3
+lib.asm
+
+
+
+    115					 ; ax =	filler symbol
+    116	0038  B0 B0			 mov al, chr_fill
+    117	003A  B4 1F			 mov ah, tbl_IN	+ txt_IN
+    118
+    119	003C  FC			 cld
+    120	003D			     newline:
+    121	003D  AB			 stosw
+    122	003E  E2 FD			 loop newline
+    123					 ; cx == 0 <=> end of line
+    124
+    125					 ; di -> next line
+    126					 ; si++	as new line
+    127	0040  BA 0052			     mov dx, CONS_WIDTH	+ 2
+    128	0043  2B 56 08			     sub dx, [bp + 8]
+    129	0046  D1 E2			     shl dx, 1
+    130	0048  03 FA			 add di, dx
+    131	004A  46			 inc si
+    132
+    133					 ; cx =	width -	2 (restore)
+    134	004B  8B 4E 08			 mov cx, [bp + 8]
+    135	004E  83 E9 02			 sub cx, 2
+    136
+    137	0051  3B F3			 cmp si, bx
+    138	0053  75 E8			 jne newline
+    139					 ; si == bx <=>	end of lines
+    140
+    141				     ; UP & DOWN LINES
+    142
+    143					 ; di =	LU corner + 1x
+    144	0055  8B 46 06			     mov ax, [bp + 6]	 ;
+    145	0058  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	y * CONS_WIDTH
+    146	005B  F7 E2			     mul dx		 ;
+    147
+    148	005D  03 46 04			     add ax, [bp + 4]	 ;
+    149	0060  40			     inc ax		 ; ax += x + 1
+    150
+    151	0061  D1 E0			     shl ax, 1		 ; ax *= 2
+    152	0063  8B F8			 mov di, ax		 ; res:	di = (y	* CONS_WIDTH + x + 1) *	2
+    153
+    154					 ; dx -	displacement to	down line
+    155	0065  8B 46 0A			     mov ax, [bp + 10]	 ;
+    156	0068  48			     dec ax		 ;
+    157	0069  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	(height	- 1) * CONS_WIDTH
+    158	006C  F7 E2			     mul dx		 ;
+    159
+    160	006E  D1 E0			     shl ax, 1		 ; ax *= 2
+    161	0070  8B D0			 mov dx, ax		 ; res:	dx = (height - 1) * CONS_WIDTH * 2
+    162
+    163					 ; cx =	width -	2
+    164	0072  8B 4E 08			 mov cx, [bp + 8]
+    165	0075  83 E9 02			 sub cx, 2
+    166
+    167					 ; ax =	table horyzontal symbol
+    168	0078  B0 CD			 mov al, tbl_H
+    169	007A  B4 3F			 mov ah, tbl_BD	+ txt_BD
+    170
+    171	007C			     inc_x:
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 4
+lib.asm
+
+
+
+    172	007C  26: 89 05			 mov es:[di], ax ; up line
+    173	007F  03 FA			 add di, dx
+    174	0081  26: 89 05			 mov es:[di], ax ; down	line
+    175	0084  2B FA			 sub di, dx
+    176
+    177	0086  83 C7 02			 add di, 2
+    178	0089  E2 F1			 loop inc_x
+    179					 ; cx == 0 <=> end of line
+    180
+    181				     ; LEFT & RIGHT LINES
+    182
+    183					 ; di -> LU corner + 1y
+    184	008B  8B 46 06			     mov ax, [bp + 6]	 ;
+    185	008E  40			     inc ax		 ;
+    186	008F  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	(y + 1)	* CONS_WIDTH
+    187	0092  F7 E2			     mul dx		 ;
+    188
+    189	0094  03 46 04			     add ax, [bp + 4]	 ; ax += x
+    190
+    191	0097  D1 E0			     shl ax, 1		 ; ax *= 2
+    192	0099  8B F8			 mov di, ax		 ; res:	di = ((y + 1) *	CONS_WIDTH + x)	* 2
+    193
+    194					 ; dx -	displacement to	right line
+    195	009B  8B 46 08			     mov ax, [bp + 8]	 ;
+    196	009E  48			     dec ax		 ; ax =	width -	1
+    197
+    198	009F  D1 E0			     shl ax, 1		 ; ax *= 2
+    199	00A1  8B D0			 mov dx, ax		 ; res:	dx = (width - 1) * 2
+    200
+    201					 ; cx =	height - 2
+    202	00A3  8B 4E 0A			 mov cx, [bp + 10]
+    203	00A6  83 E9 02			 sub cx, 2
+    204
+    205					 ; ax =	table vertical symbol
+    206	00A9  B0 BA			 mov al, tbl_V
+    207	00AB  B4 3F			 mov ah, tbl_BD	+ txt_BD
+    208
+    209	00AD			     inc_y:
+    210	00AD  26: 89 05			 mov es:[di], ax ; left	line
+    211	00B0  03 FA			 add di, dx
+    212	00B2  26: 89 05			 mov es:[di], ax ; right line
+    213	00B5  2B FA			 sub di, dx
+    214
+    215	00B7  81 C7 00A0		 add di, CONS_WIDTH * 2
+    216	00BB  E2 F0			 loop inc_y
+    217					 ; cx == 0 <=> end of column
+    218
+    219				     ; CORNERS
+    220
+    221					 ; di -> LU corner
+    222	00BD  8B 46 06			     mov ax, [bp + 6]	 ;
+    223	00C0  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	y * CONS_WIDTH
+    224	00C3  F7 E2			     mul dx		 ;
+    225
+    226	00C5  03 46 04			     add ax, [bp + 4]	 ; ax += x
+    227
+    228	00C8  D1 E0			     shl ax, 1		 ; ax *= 2
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 5
+lib.asm
+
+
+
+    229	00CA  8B F8			 mov di, ax		 ; res:	di = (y	* CONS_WIDTH + x) * 2
+    230
+    231					 ; ax =	LU corner symbol
+    232	00CC  B0 C9			 mov al, tbl_LU
+    233	00CE  B4 3F			 mov ah, tbl_BD	+ txt_BD
+    234
+    235	00D0  26: 89 05			 mov es:[di], ax
+    236
+    237
+    238					 ; di -> RU corner
+    239	00D3  8B 46 08			     mov ax, [bp + 8]
+    240	00D6  48			     dec ax
+    241	00D7  D1 E0			     shl ax, 1
+    242	00D9  03 F8			 add di, ax		 ; res:	di = (y	* CONS_WIDTH + x + width - 1) *	2
+    243
+    244					 ; ax =	LU corner symbol
+    245	00DB  B0 58			 mov al, tbl_RU
+    246	00DD  B4 3F			 mov ah, tbl_BD	+ txt_BD
+    247
+    248	00DF  26: 89 05			 mov es:[di], ax
+    249
+    250
+    251					 ; di -> RD corner
+    252	00E2  8B 46 0A			     mov ax, [bp + 10]
+    253	00E5  48			     dec ax
+    254	00E6  BA 0050			     mov dx, CONS_WIDTH
+    255	00E9  F7 E2			     mul dx
+    256	00EB  D1 E0			     shl ax, 1
+    257	00ED  03 F8			 add di, ax		 ; res:	di = ((y + height - 1) * CONS_WIDTH + x	+ width	- 1) * 2
+    258
+    259					 ; ax =	RD corner symbol
+    260	00EF  B0 BC			 mov al, tbl_RD
+    261	00F1  B4 3F			 mov ah, tbl_BD	+ txt_BD
+    262
+    263	00F3  26: 89 05			 mov es:[di], ax
+    264
+    265
+    266					 ; di -> LD corner
+    267	00F6  8B 46 08			     mov ax, [bp + 8]
+    268	00F9  48			     dec ax
+    269	00FA  D1 E0			     shl ax, 1
+    270	00FC  2B F8			 sub di, ax		 ; res:	di = ((y + height - 1) * CONS_WIDTH + x) * 2
+    271
+    272					 ; ax =	LD corner symbol
+    273	00FE  B0 C8			 mov al, tbl_LD
+    274	0100  B4 3F			 mov ah, tbl_BD	+ txt_BD
+    275
+    276	0102  26: 89 05			 mov es:[di], ax
+    277
+    278				     ; PRINTING	MESSAGES
+    279
+    280					 ; di -> LU corner + 1x	+ 1y
+    281	0105  8B 46 06			     mov ax, [bp + 6]	 ;
+    282	0108  40			     inc ax		 ;
+    283	0109  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	(y + 1)	* CONS_WIDTH
+    284	010C  F7 E2			     mul dx		 ;
+    285
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 6
+lib.asm
+
+
+
+    286	010E  03 46 04			     add ax, [bp + 4]	 ;
+    287	0111  40			     inc ax		 ; ax += x + 1
+    288
+    289	0112  D1 E0			     shl ax, 1		 ; ax *= 2
+    290	0114  8B F8			 mov di, ax		 ; res:	di = ((y + 1) *	CONS_WIDTH + x + 1) * 2
+    291					 ; backup di
+    292	0116  57			 push di
+    293
+    294					 ; si -> message #1
+    295	0117  BE 0019r			 mov si, offset	msg
+    296
+    297					 ; ah =	message	color
+    298	011A  B4 1F			 mov ah, tbl_IN	+ txt_IN
+    299
+    300					 ; print_msg( ax, si, di )
+    301	011C  E8 016A			 call print_msg
+    302
+    303
+    304					 ; load	di from	backup
+    305	011F  5F			 pop di
+    306
+    307					 ; di -> LD corner + 1x	- 1y
+    308	0120  8B 46 0A			     mov ax, [bp + 10]	 ;
+    309	0123  2D 0003			     sub ax, 3		 ;
+    310	0126  BA 0050			     mov dx, CONS_WIDTH	 ; ax =	(height	- 3) * CONS_WIDTH
+    311	0129  F7 E2			     mul dx		 ;
+    312
+    313	012B  D1 E0			     shl ax, 1		 ; ax *= 2
+    314	012D  03 F8			 add di, ax		 ; res:	di = ((y + height - 2) * CONS_WIDTH + x	+ 1) * 2
+    315
+    316					 ; si -> message #2
+    317	012F  BE 0028r			 mov si, offset	msg2
+    318
+    319					 ; ax =	message	color
+    320	0132  B4 1F			 mov ah, tbl_IN	+ txt_IN
+    321
+    322					 ; print_msg( ax, si, di )
+    323	0134  E8 0152			 call print_msg
+    324
+    325					 ;---------------------------------------------
+    326
+    327	0137  5D			 pop bp
+    328	0138  C3			 ret
+    329	0139				 endp
+    330
+    331				     ;HHH=================================================HHH
+    332				     ;HHH						  HHH
+    333				     ;HHH		    printDec			  HHH
+    334				     ;HHH - print a number as decimal			  HHH
+    335				     ;HHH						  HHH
+    336				     ;HHH   INPUT: stack: > num	 (the number to	print)	  HHH
+    337				     ;HHH		    x	 (position x)		  HHH
+    338				     ;HHH		    y	 (position y)		  HHH
+    339				     ;HHH  OUTPUT: --					  HHH
+    340				     ;HHH DESTROY: AX, BX, CX, DX			  HHH
+    341				     ;HHH	   DI, ES				  HHH
+    342				     ;HHH						  HHH
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 7
+lib.asm
+
+
+
+    343				     ;HHH WARNING: reverse printing			  HHH
+    344				     ;HHH						  HHH
+    345				     ;HHH=================================================HHH
+    346
+    347	0139			     printDec proc
+    348	0139  55			 push bp
+    349	013A  8B EC			 mov bp, sp
+    350
+    351					 ; num = [bp + 4]
+    352					 ;   x = [bp + 6]
+    353					 ;   y = [bp + 8]
+    354
+    355					 ;---------------------------------------------
+    356
+    357	013C  FD			 std
+    358
+    359					 ; es -> video memory
+    360	013D  B8 B800			 mov ax, VIDEO_MEM
+    361	0140  8E C0			 mov es, ax
+    362
+    363					 ; di -> (x, y)
+    364	0142  8B 46 08			     mov ax, [bp + 8]	 ;
+    365	0145  BB 0050			     mov bx, CONS_WIDTH	 ; ax =	y * CONS_WIDTH
+    366	0148  F7 E3			     mul bx		 ;
+    367
+    368	014A  03 46 06			     add ax, [bp + 6]	 ; ax += x
+    369
+    370	014D  D1 E0			     shl ax, 1		 ; ax *= 2
+    371	014F  8B F8			 mov di, ax		 ; res:	di = (y	* CONS_WIDTH + 2) * 2
+    372
+    373					 ; bx =	10 (decimal)
+    374	0151  BB 000A			 mov bx, 10d
+    375
+    376					 ; ax =	num
+    377	0154  8B 46 04			 mov ax, [bp + 4]
+    378
+    379	0157			     dec_step:
+    380	0157  BA 0000			 mov dx, 0
+    381					 ; ax =	ax / bx
+    382					 ; dx =	ax % bx
+    383	015A  F7 F3			 div bx
+    384
+    385					 ; cx =	ax (div)
+    386	015C  8B C8			 mov cx, ax
+    387
+    388					 ; ax =	dx (rem)
+    389	015E  8B C2			 mov ax, dx
+    390
+    391					 ; ax =	digit to print
+    392	0160  05 0030			 add ax, '0'
+    393	0163  B4 02			 mov ah, num_CLR
+    394	0165  AB			 stosw
+    395
+    396					 ; ax =	cx (div)
+    397	0166  8B C1			 mov ax, cx
+    398
+    399	0168  3D 0000			 cmp ax, 0
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 8
+lib.asm
+
+
+
+    400	016B  75 EA			 jne dec_step
+    401
+    402	016D  FC			 cld
+    403
+    404					 ;---------------------------------------------
+    405
+    406	016E  5D			 pop bp
+    407	016F  C3			 ret
+    408	0170				 endp
+    409
+    410				     ;HHH=================================================HHH
+    411				     ;HHH						  HHH
+    412				     ;HHH		    printBin			  HHH
+    413				     ;HHH - print a number as binary			  HHH
+    414				     ;HHH						  HHH
+    415				     ;HHH   INPUT: stack: > num	 (the number to	print)	  HHH
+    416				     ;HHH		    x	 (position x)		  HHH
+    417				     ;HHH		    y	 (position y)		  HHH
+    418				     ;HHH  OUTPUT: --					  HHH
+    419				     ;HHH DESTROY: AX, BX, CX, DX			  HHH
+    420				     ;HHH	   DI, ES				  HHH
+    421				     ;HHH						  HHH
+    422				     ;HHH WARNING: reverse printing			  HHH
+    423				     ;HHH						  HHH
+    424				     ;HHH=================================================HHH
+    425
+    426	0170			     printBin proc
+    427	0170  55			 push bp
+    428	0171  8B EC			 mov bp, sp
+    429
+    430					 ; num = [bp + 4]
+    431					 ;   x = [bp + 6]
+    432					 ;   y = [bp + 8]
+    433
+    434					 ;---------------------------------------------
+    435
+    436	0173  FD			 std
+    437
+    438					 ; es -> video memory
+    439	0174  B8 B800			 mov ax, VIDEO_MEM
+    440	0177  8E C0			 mov es, ax
+    441
+    442					 ; di -> (x, y)
+    443	0179  8B 46 08			     mov ax, [bp + 8]	 ;
+    444	017C  BB 0050			     mov bx, CONS_WIDTH	 ; ax =	y * CONS_WIDTH
+    445	017F  F7 E3			     mul bx		 ;
+    446
+    447	0181  03 46 06			     add ax, [bp + 6]	 ; ax += x
+    448
+    449	0184  D1 E0			     shl ax, 1		 ; ax *= 2
+    450	0186  8B F8			 mov di, ax		 ; res:	di = (y	* CONS_WIDTH + 2) * 2
+    451
+    452					 ; ax =	num
+    453	0188  8B 46 04			 mov ax, [bp + 4]
+    454
+    455	018B			     bin_step:
+    456	018B  50			 push ax
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 9
+lib.asm
+
+
+
+    457
+    458					 ; ax %	2 <=> last bit
+    459	018C  25 0001			 and ax, 01h
+    460
+    461					 ; ax =	digit to print
+    462	018F  04 30			 add al, '0'
+    463	0191  B4 02			 mov ah, num_CLR
+    464	0193  AB			 stosw
+    465
+    466	0194  58			 pop ax
+    467
+    468					 ; ax /= 2
+    469	0195  D1 E8			 shr ax, 1
+    470
+    471	0197  3D 0000			 cmp ax, 0
+    472	019A  75 EF			 jne bin_step
+    473
+    474	019C  FC			 cld
+    475
+    476					 ;---------------------------------------------
+    477
+    478	019D  5D			 pop bp
+    479	019E  C3			 ret
+    480	019F				 endp
+    481
+    482				     ;HHH=================================================HHH
+    483				     ;HHH						  HHH
+    484				     ;HHH		    printHex			  HHH
+    485				     ;HHH - print a number as a	hex number		  HHH
+    486				     ;HHH						  HHH
+    487				     ;HHH   INPUT: stack: > num	 (the number to	print)	  HHH
+    488				     ;HHH		    x	 (position x)		  HHH
+    489				     ;HHH		    y	 (position y)		  HHH
+    490				     ;HHH  OUTPUT: --					  HHH
+    491				     ;HHH DESTROY: AX, BX, CX, DX			  HHH
+    492				     ;HHH	   DI, ES				  HHH
+    493				     ;HHH						  HHH
+    494				     ;HHH WARNING: reverse printing			  HHH
+    495				     ;HHH						  HHH
+    496				     ;HHH=================================================HHH
+    497
+    498	019F			     printHex proc
+    499	019F  55			 push bp
+    500	01A0  8B EC			 mov bp, sp
+    501
+    502					 ; num = [bp + 4]
+    503					 ;   x = [bp + 6]
+    504					 ;   y = [bp + 8]
+    505
+    506					 ;---------------------------------------------
+    507
+    508	01A2  FD			 std
+    509
+    510					 ; es -> video memory
+    511	01A3  B8 B800			 mov ax, VIDEO_MEM
+    512	01A6  8E C0			 mov es, ax
+    513
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 10
+lib.asm
+
+
+
+    514					 ; di -> (x, y)
+    515	01A8  8B 46 08			     mov ax, [bp + 8]	 ;
+    516	01AB  BB 0050			     mov bx, CONS_WIDTH	 ; ax =	y * CONS_WIDTH
+    517	01AE  F7 E3			     mul bx		 ;
+    518
+    519	01B0  03 46 06			     add ax, [bp + 6]	 ; ax += x
+    520
+    521	01B3  D1 E0			     shl ax, 1		 ; ax *= 2
+    522	01B5  8B F8			 mov di, ax		 ; res:	di = (y	* CONS_WIDTH + 2) * 2
+    523
+    524					 ; ax =	num
+    525	01B7  8B 46 04			 mov ax, [bp + 4]
+    526
+    527	01BA			     hex_step:
+    528	01BA  50			 push ax
+    529
+    530					 ; ax %	2 <=> last 4 bits (F = 1111)
+    531	01BB  25 000F			 and ax, 0Fh
+    532
+    533	01BE  3D 000A			 cmp ax, 10d
+    534	01C1  72 02			 jb hex_isnumber
+    535	01C3  04 07			     add al, 'A'  - '0'	- 10
+    536	01C5			     hex_isnumber:
+    537
+    538					 ; ax =	digit/char to print
+    539	01C5  04 30			 add al, '0'
+    540	01C7  B4 02			 mov ah, num_CLR
+    541	01C9  AB			 stosw
+    542
+    543	01CA  58			 pop ax
+    544
+    545					 ; ax /= 16
+    546	01CB  D1 E8 D1 E8 D1 E8	D1+	 shr ax, 4
+    547	      E8
+    548
+    549	01D3  3D 0000			 cmp ax, 0
+    550	01D6  75 E2			 jne hex_step
+    551
+    552	01D8  FC			 cld
+    553
+    554					 ;---------------------------------------------
+    555
+    556	01D9  5D			 pop bp
+    557	01DA  C3			 ret
+    558	01DB				 endp
+    559
+    560				     ;HHH=================================================HHH
+    561				     ;HHH						  HHH
+    562				     ;HHH		    getDec			  HHH
+    563				     ;HHH - interprete string as decimal number		  HHH
+    564				     ;HHH						  HHH
+    565				     ;HHH   INPUT: stack: > str	(string	position)	  HHH
+    566				     ;HHH  OUTPUT: BX					  HHH
+    567				     ;HHH DESTROY: AX, BX, CX, DX			  HHH
+    568				     ;HHH	   SI, DI				  HHH
+    569				     ;HHH						  HHH
+    570				     ;HHH=================================================HHH
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 11
+lib.asm
+
+
+
+    571
+    572	01DB			     getDec proc
+    573	01DB  55			 push bp
+    574	01DC  8B EC			 mov bp, sp
+    575
+    576					 ; str = [bp + 4]
+    577
+    578					 ;---------------------------------------------
+    579
+    580	01DE  FC			 cld
+    581
+    582					 ; si -> str
+    583	01DF  8B 76 04			 mov si, [bp + 4]
+    584
+    585					 ; push	position si - 1	(start of line)
+    586	01E2  4E			 dec si
+    587	01E3  56			 push si
+    588	01E4  46			 inc si
+    589
+    590					 ; search for '$' - end	of line
+    591	01E5			     dec_getend:
+    592	01E5  AC			 lodsb
+    593	01E6  3C 24			 cmp al, '$'
+    594	01E8  75 FB			 jne dec_getend
+    595
+    596	01EA  83 EE 02			 sub si, 2
+    597
+    598	01ED  FD			 std
+    599
+    600	01EE  B8 0000			 mov ax, 0   ; corrent digit
+    601	01F1  BB 0000			 mov bx, 0   ; total   number
+    602	01F4  B9 0001			 mov cx, 1   ; power
+    603	01F7			     getDec_loop:
+    604					 ; ax =	[si--]
+    605	01F7  AC			 lodsb
+    606
+    607					 ; char	=> number
+    608	01F8  2D 0030			 sub ax, '0'
+    609
+    610					 ; ax *= 10^cl
+    611	01FB  F6 E1			 mul cl
+    612
+    613	01FD  50			 push ax
+    614
+    615	01FE  8B C1			 mov ax, cx  ;
+    616	0200  D1 E0			 shl ax, 1   ;
+    617	0202  D1 E1 D1 E1 D1 E1		 shl cx, 3   ; cx *= 10
+    618	0208  03 C8			 add cx, ax  ;
+    619
+    620	020A  58			 pop ax
+    621
+    622					 ; total += digit
+    623	020B  03 D8			 add bx, ax
+    624
+    625	020D  3B 76 FE			 cmp si, [bp - 2]
+    626	0210  75 E5			 jne getDec_loop
+    627					 ; until si == start of	line
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 12
+lib.asm
+
+
+
+    628
+    629	0212  5E			 pop si
+    630	0213  FC			 cld
+    631
+    632					 ;---------------------------------------------
+    633
+    634	0214  5D			 pop bp
+    635	0215  C3			 ret
+    636	0216				 endp
+    637
+    638				     ;HHH=================================================HHH
+    639				     ;HHH						  HHH
+    640				     ;HHH		    getBin			  HHH
+    641				     ;HHH - interprete string as binary	number		  HHH
+    642				     ;HHH						  HHH
+    643				     ;HHH   INPUT: stack: > str	(string	position)	  HHH
+    644				     ;HHH  OUTPUT: BX					  HHH
+    645				     ;HHH DESTROY: AX, BX, CX				  HHH
+    646				     ;HHH	   SI, DI				  HHH					    +
+    647				     ;HHH						  HHH
+    648				     ;HHH=================================================HHH
+    649
+    650	0216			     getBin proc
+    651	0216  55			 push bp
+    652	0217  8B EC			 mov bp, sp
+    653
+    654					 ; str = [bp + 4]
+    655
+    656					 ;---------------------------------------------
+    657
+    658	0219  FC			 cld
+    659
+    660					 ; si -> str
+    661	021A  8B 76 04			 mov si, [bp + 4]
+    662
+    663					 ; push	position si - 1	(start of line)
+    664	021D  4E			 dec si
+    665	021E  56			 push si
+    666	021F  46			 inc si
+    667
+    668					 ; search for '$' - end	of line
+    669	0220			     bin_getend:
+    670	0220  AC			 lodsb
+    671	0221  3C 24			 cmp al, '$'
+    672	0223  75 FB			 jne bin_getend
+    673
+    674	0225  83 EE 02			 sub si, 2
+    675
+    676	0228  FD			 std
+    677
+    678	0229  B8 0000			 mov ax, 0   ; current digit
+    679	022C  BB 0000			 mov bx, 0   ; total   number
+    680	022F  B9 0000			 mov cx, 0   ; power
+    681	0232			     getBin_loop:
+    682					 ; ax =	[si--]
+    683	0232  B8 0000			 mov ax, 0
+    684	0235  AC			 lodsb
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 13
+lib.asm
+
+
+
+    685
+    686					 ; char	=> number
+    687	0236  2D 0030			 sub ax, '0'
+    688
+    689					 ; ax *= 2^cl
+    690	0239  D3 E0			 shl ax, cl
+    691
+    692					 ; cx *= 2
+    693	023B  41			 inc cx
+    694
+    695					 ; total += digit
+    696	023C  03 D8			 add bx, ax
+    697
+    698	023E  3B 76 FE			 cmp si, [bp - 2]
+    699	0241  75 EF			 jne getBin_loop
+    700					 ; until si == start of	line
+    701
+    702	0243  5E			 pop si
+    703	0244  FC			 cld
+    704
+    705					 ;---------------------------------------------
+    706
+    707	0245  5D			 pop bp
+    708	0246  C3			 ret
+    709	0247				 endp
+    710
+    711				     ;HHH=================================================HHH
+    712				     ;HHH						  HHH
+    713				     ;HHH		    getHex			  HHH
+    714				     ;HHH - interprete string as hex number		  HHH
+    715				     ;HHH						  HHH
+    716				     ;HHH   INPUT: stack: > str	(string	position)	  HHH
+    717				     ;HHH  OUTPUT: BX					  HHH
+    718				     ;HHH DESTROY: AX, BX, CX				  HHH
+    719				     ;HHH	   SI, DI				  HHH
+    720				     ;HHH						  HHH
+    721				     ;HHH=================================================HHH
+    722
+    723	0247			     getHex proc
+    724	0247  55			 push bp
+    725	0248  8B EC			 mov bp, sp
+    726
+    727					 ; str = [bp + 4]
+    728
+    729					 ;---------------------------------------------
+    730
+    731	024A  FC			 cld
+    732
+    733					 ; si -> str
+    734	024B  8B 76 04			 mov si, [bp + 4]
+    735
+    736					 ; push	position si - 1	(start of line)
+    737	024E  4E			 dec si
+    738	024F  56			 push si
+    739	0250  46			 inc si
+    740
+    741					 ; search for '$' - end	of line
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 14
+lib.asm
+
+
+
+    742	0251			     hex_getend:
+    743	0251  AC			 lodsb
+    744	0252  3C 24			 cmp al, '$'
+    745	0254  75 FB			 jne hex_getend
+    746
+    747	0256  83 EE 02			 sub si, 2
+    748
+    749	0259  FD			 std
+    750
+    751	025A  B8 0000			 mov ax, 0   ; current digit
+    752	025D  BB 0000			 mov bx, 0   ; total   number
+    753	0260  B9 0000			 mov cx, 0   ; power
+    754	0263			     getHex_loop:
+    755					 ; ax =	[si--]
+    756	0263  B4 00			 mov ah, 0
+    757	0265  AC			 lodsb
+    758
+    759	0266  3D 0061			 cmp ax, 'a'
+    760	0269  72 03			 jb getHex_less_small
+    761	026B  05 FFE0			     add ax, -'a' + 'A'
+    762	026E			     getHex_less_small:
+    763
+    764	026E  3D 0041			 cmp ax, 'A'
+    765	0271  72 03			 jb getHex_less_letter
+    766	0273  05 FFF9			     add ax, -'A' + 10 + '0'
+    767	0276			     getHex_less_letter:
+    768
+    769	0276  2D 0030			 sub ax, '0'
+    770
+    771					 ; ax *= 2^cl
+    772	0279  D3 E0			 shl ax, cl
+    773
+    774					 ; cx += 4 (0 -> 16 -> 256 -> ...)
+    775	027B  83 C1 04			 add cx, 4
+    776
+    777					 ; total += digit
+    778	027E  03 D8			 add bx, ax
+    779
+    780	0280  3B 76 FE			 cmp si, [bp - 2]
+    781	0283  75 DE			 jne getHex_loop
+    782					 ; until si == start of	line
+    783
+    784	0285  5E			 pop si
+    785	0286  FC			 cld
+    786
+    787					 ;---------------------------------------------
+    788
+    789	0287  5D			 pop bp
+    790	0288  C3			 ret
+    791	0289				 endp
+    792
+    793				     ;HHH=================================================HHH
+    794				     ;HHH						  HHH
+    795				     ;HHH	      (!!!) INLINE (!!!)		  HHH
+    796				     ;HHH						  HHH
+    797				     ;HHH		    print_msg			  HHH
+    798				     ;HHH - print a message				  HHH
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 15
+lib.asm
+
+
+
+    799				     ;HHH						  HHH
+    800				     ;HHH   INPUT: AH -	color of text			  HHH
+    801				     ;HHH	   SI -	message	to print		  HHH
+    802				     ;HHH	   DI -	position to print		  HHH
+    803				     ;HHH  OUTPUT: --					  HHH
+    804				     ;HHH DESTROY: AX					  HHH
+    805				     ;HHH	   SI, DI				  HHH
+    806				     ;HHH						  HHH
+    807				     ;HHH=================================================HHH
+    808
+    809	0289			     print_msg:
+    810	0289  AC			 lodsb
+    811	028A  3C 24			 cmp al, '$'
+    812	028C  74 03			 je endmsg
+    813	028E  AB			     stosw
+    814	028F  EB F8			     jmp print_msg
+    815	0291			     endmsg:
+    816	0291  C3			 ret
+    817
+    818				     ;=================================================
+    819
+    820	0292			     .data
+    821	0000  53 6F 20 61 78 20	69+  ax_ten	db 'So ax is 10$'
+    822	      73 20 31 30 24
+    823	000C  41 78 20 69 73 20	6E+  ax_not_ten	db 'Ax is not 10$'
+    824	      6F 74 20 31 30 24
+    825	0019  53 6F 6D 65 20 59	6F+  msg	db 'Some Yota ad.*$'
+    826	      74 61 20 61 64 2E	2A+
+    827	      24
+    828	0028  2A 20 2D 20 73 6F	6D+  msg2	db '* -	some useless star.$'
+    829	      65 20 75 73 65 6C	65+
+    830	      73 73 20 73 74 61	72+
+    831	      2E 24
+    832
+    833				     end
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 16
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "02/25/19"
+??FILENAME			  Text	 "lib	  "
+??TIME				  Text	 "18:31:15"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _DATA
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 LIB
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+AX_NOT_TEN			  Byte	 DGROUP:000C
+AX_TEN				  Byte	 DGROUP:0000
+BIN_GETEND			  Near	 DGROUP:0220
+BIN_STEP			  Near	 DGROUP:018B
+CHR_EMPTY			  Number 0000
+CHR_FILL			  Number 00B0
+CLR_WHITE			  Number 000F
+COL_WIDTH			  Number 000D
+CONS_WIDTH			  Number 0050
+DEC_GETEND			  Near	 DGROUP:01E5
+DEC_STEP			  Near	 DGROUP:0157
+ENDMSG				  Near	 DGROUP:0291
+GETBIN				  Near	 DGROUP:0216
+GETBIN_LOOP			  Near	 DGROUP:0232
+GETDEC				  Near	 DGROUP:01DB
+GETDEC_LOOP			  Near	 DGROUP:01F7
+GETHEX				  Near	 DGROUP:0247
+GETHEX_LESS_LETTER		  Near	 DGROUP:0276
+GETHEX_LESS_SMALL		  Near	 DGROUP:026E
+GETHEX_LOOP			  Near	 DGROUP:0263
+HEX_GETEND			  Near	 DGROUP:0251
+HEX_ISNUMBER			  Near	 DGROUP:01C5
+HEX_STEP			  Near	 DGROUP:01BA
+INC_X				  Near	 DGROUP:007C
+INC_Y				  Near	 DGROUP:00AD
+LAST_LINE			  Number 000E
+MAKEFRAME			  Near	 DGROUP:0010
+MSG				  Byte	 DGROUP:0019
+MSG2				  Byte	 DGROUP:0028
+NEWLINE				  Near	 DGROUP:003D
+NUM_CLR				  Number 0002
+PRINTBIN			  Near	 DGROUP:0170
+PRINTDEC			  Near	 DGROUP:0139
+PRINTHEX			  Near	 DGROUP:019F
+PRINT_MSG			  Near	 DGROUP:0289
+TBL_BD				  Number 0030
+TBL_H				  Number 00CD
+TBL_IN				  Number 0010
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 17
+Symbol Table
+
+
+
+TBL_LD				  Number 00C8
+TBL_LU				  Number 00C9
+TBL_RD				  Number 00BC
+TBL_RU				  Number 0058
+TBL_V				  Number 00BA
+TXT_BD				  Number 000F
+TXT_IN				  Number 000F
+VAR_CHECK			  Near	 DGROUP:0000
+VIDEO_MEM			  Number B800
+_A				  Number [DGROUP:BP+0004]
+_B				  Number [DGROUP:BP+0006]
+_C				  Number [DGROUP:BP+0008]
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  003F Word	  Public  DATA
+  _TEXT				  16  0292 Word	  Public  CODE
+

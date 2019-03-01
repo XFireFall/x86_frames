@@ -1,0 +1,369 @@
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 1
+main.asm
+
+
+
+      1				     ;HHH========================================================================HHH;
+      2				     ;HHH									 HHH;
+      3				     ;HHH		     Multy-frames and num -> str -> num			 HHH;
+      4				     ;HHH									 HHH;
+      5				     ;HHH========================================================================HHH;
+      6
+      7	0000			     .model tiny
+      8
+      9				     ;	 Machine constants
+     10
+     11	      =B800		     VIDEO_MEM	= 0b800h
+     12	      =0050		     CONS_WIDTH	=    80d
+     13	      =000E		     LAST_LINE	=    14d
+     14
+     15				     ;	 Local constants
+     16
+     17	      =000F		     clr_white = 00Fh ;	white
+     18
+     19	      =000D		     col_width =  13d
+     20
+     21	0000			     .code
+     22
+     23				     extrn makeFrame : proc
+     24				     extrn printDec  : proc
+     25				     extrn printBin  : proc
+     26				     extrn printHex  : proc
+     27				     extrn getDec    : proc
+     28				     extrn getBin    : proc
+     29				     extrn getHex    : proc
+     30
+     31				     extrn var_check : proc
+     32
+     33				     org 100h
+     34
+     35	0100			     start:
+     36					 ; clear window
+     37	0100  B8 0002			 mov ax, 2h
+     38	0103  CD 10			 int 10h
+     39
+     40	0105  B8 B800			 mov ax, VIDEO_MEM
+     41	0108  8E C0			 mov es, ax
+     42
+     43	010A  BF 0000			 mov di, 0
+     44
+     45	010D  B4 01			 mov ah, 01h
+     46	010F  CD 21			 int 21h
+     47
+     48	0111  3C 64			 cmp al, 'd'
+     49	0113  75 06			 jne not_dec
+     50	0115  BE 0000r			     mov si, offset s_dec
+     51	0118  EB 0E 90			     jmp ready
+     52	011B			     not_dec:
+     53	011B  3C 62			 cmp al, 'b'
+     54	011D  75 06			 jne not_bin
+     55	011F  BE 0004r			     mov si, offset s_bin
+     56	0122  EB 04 90			     jmp ready
+     57	0125			     not_bin:
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 2
+main.asm
+
+
+
+     58	0125  BE 000Dr			 mov si, offset	s_hex
+     59	0128			     ready:
+     60
+     61	0128			     loo:
+     62	0128  B4 01			 mov ah, 01h
+     63	012A  CD 21			 int 21h
+     64
+     65	012C  3C 0D			 cmp al, 0Dh
+     66	012E  74 05			 je endloo
+     67
+     68	0130  88 04			 mov ds:[si], al
+     69	0132  46			 inc si
+     70
+     71	0133  EB F3			 jmp loo
+     72	0135			     endloo:
+     73	0135  C7 04 0024		 mov ds:[si], '$'
+*Warning* main.asm(73) Argument	needs type override
+     74
+     75					 ; frame (5, 3)	50x5
+     76	0139  B8 0005			 mov ax, 5 ; height
+     77	013C  50			 push ax
+     78	013D  B8 0032			 mov ax, 50 ; width
+     79	0140  50			 push ax
+     80	0141  B8 0003			 mov ax, 3 ; y
+     81	0144  50			 push ax
+     82	0145  B8 0005			 mov ax, 5 ; x
+     83	0148  50			 push ax
+     84	0149  E8 0000e			 call makeFrame
+     85	014C  83 C4 08			 add sp, 2 * 4
+     86
+     87					 ; frame (45, 2) 25x4
+     88	014F  B8 0004			 mov ax, 4 ; height
+     89	0152  50			 push ax
+     90	0153  B8 0019			 mov ax, 25 ; width
+     91	0156  50			 push ax
+     92	0157  B8 0002			 mov ax, 2 ; y
+     93	015A  50			 push ax
+     94	015B  B8 002D			 mov ax, 45 ; x
+     95	015E  50			 push ax
+     96	015F  E8 0000e			 call makeFrame
+     97	0162  83 C4 08			 add sp, 2 * 4
+     98
+     99				     ; DEC
+    100	0165  B8 0000r			 mov ax, offset	s_dec
+    101	0168  50			 push ax
+    102	0169  E8 0000e			 call getDec
+    103	016C  83 C4 02			 add sp, 2 * 1
+    104
+    105	016F  53			 push bx
+    106
+    107	0170  B8 0000			 mov ax, 0 ; y
+    108	0173  50			 push ax
+    109	0174  B8 000D			 mov ax, col_width ; x
+    110	0177  50			 push ax
+    111	0178  8B C3			 mov ax, bx ; num
+    112	017A  50			 push ax
+    113	017B  E8 0000e			 call printDec
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 3
+main.asm
+
+
+
+    114	017E  83 C4 06			 add sp, 2 * 3
+    115
+    116	0181  5B			 pop bx
+    117	0182  53			 push bx
+    118
+    119	0183  B8 0000			 mov ax, 0 ; y
+    120	0186  50			 push ax
+    121	0187  B8 001A			 mov ax, col_width * 2 ; x
+    122	018A  50			 push ax
+    123	018B  8B C3			 mov ax, bx ; num
+    124	018D  50			 push ax
+    125	018E  E8 0000e			 call printBin
+    126	0191  83 C4 06			 add sp, 2 * 3
+    127
+    128	0194  5B			 pop bx
+    129
+    130	0195  B8 0000			 mov ax, 0 ; y
+    131	0198  50			 push ax
+    132	0199  B8 0027			 mov ax, col_width * 3 ; x
+    133	019C  50			 push ax
+    134	019D  8B C3			 mov ax, bx ; num
+    135	019F  50			 push ax
+    136	01A0  E8 0000e			 call printHex
+    137	01A3  83 C4 06			 add sp, 2 * 3
+    138
+    139				     ; BIN
+    140	01A6  B8 0004r			 mov ax, offset	s_bin
+    141	01A9  50			 push ax
+    142	01AA  E8 0000e			 call getBin
+    143	01AD  83 C4 02			 add sp, 2 * 1
+    144
+    145	01B0  53			 push bx
+    146
+    147	01B1  B8 0001			 mov ax, 1 ; y
+    148	01B4  50			 push ax
+    149	01B5  B8 000D			 mov ax, col_width ; x
+    150	01B8  50			 push ax
+    151	01B9  8B C3			 mov ax, bx ; num
+    152	01BB  50			 push ax
+    153	01BC  E8 0000e			 call printDec
+    154	01BF  83 C4 06			 add sp, 2 * 3
+    155
+    156	01C2  5B			 pop bx
+    157	01C3  53			 push bx
+    158
+    159	01C4  B8 0001			 mov ax, 1 ; y
+    160	01C7  50			 push ax
+    161	01C8  B8 001A			 mov ax, col_width * 2 ; x
+    162	01CB  50			 push ax
+    163	01CC  8B C3			 mov ax, bx ; num
+    164	01CE  50			 push ax
+    165	01CF  E8 0000e			 call printBin
+    166	01D2  83 C4 06			 add sp, 2 * 3
+    167
+    168	01D5  5B			 pop bx
+    169
+    170	01D6  B8 0001			 mov ax, 1 ; y
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 4
+main.asm
+
+
+
+    171	01D9  50			 push ax
+    172	01DA  B8 0027			 mov ax, col_width * 3 ; x
+    173	01DD  50			 push ax
+    174	01DE  8B C3			 mov ax, bx ; num
+    175	01E0  50			 push ax
+    176	01E1  E8 0000e			 call printHex
+    177	01E4  83 C4 06			 add sp, 2 * 3
+    178
+    179				     ; HEX
+    180	01E7  B8 000Dr			 mov ax, offset	s_hex
+    181	01EA  50			 push ax
+    182	01EB  E8 0000e			 call getHex
+    183	01EE  83 C4 02			 add sp, 2 * 1
+    184
+    185	01F1  53			 push bx
+    186
+    187	01F2  B8 0002			 mov ax, 2 ; y
+    188	01F5  50			 push ax
+    189	01F6  B8 000D			 mov ax, col_width ; x
+    190	01F9  50			 push ax
+    191	01FA  8B C3			 mov ax, bx ; num
+    192	01FC  50			 push ax
+    193	01FD  E8 0000e			 call printDec
+    194	0200  83 C4 06			 add sp, 2 * 3
+    195
+    196	0203  5B			 pop bx
+    197	0204  53			 push bx
+    198
+    199	0205  B8 0002			 mov ax, 2 ; y
+    200	0208  50			 push ax
+    201	0209  B8 001A			 mov ax, col_width * 2 ; x
+    202	020C  50			 push ax
+    203	020D  8B C3			 mov ax, bx ; num
+    204	020F  50			 push ax
+    205	0210  E8 0000e			 call printBin
+    206	0213  83 C4 06			 add sp, 2 * 3
+    207
+    208	0216  5B			 pop bx
+    209
+    210	0217  B8 0002			 mov ax, 2 ; y
+    211	021A  50			 push ax
+    212	021B  B8 0027			 mov ax, col_width * 3 ; x
+    213	021E  50			 push ax
+    214	021F  8B C3			 mov ax, bx ; num
+    215	0221  50			 push ax
+    216	0222  E8 0000e			 call printHex
+    217	0225  83 C4 06			 add sp, 2 * 3
+    218
+    219	0228  B8 B800			 mov ax, VIDEO_MEM
+    220	022B  8E C0			 mov es, ax
+    221
+    222	022D  B4 0F			 mov ah, clr_white
+    223	022F  B9 0003			 mov cx, 3
+    224	0232  BF 001C			 mov di, (col_width + 1) * 2
+    225	0235			     dec_loop:
+    226	0235  B0 28			 mov al, '('
+    227	0237  26: 89 05			 mov es:[di], ax
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 5
+main.asm
+
+
+
+    228	023A  B0 31			 mov al, '1'
+    229	023C  26: 89 45	02		 mov es:[di + 2], ax
+    230	0240  B0 30			 mov al, '0'
+    231	0242  26: 89 45	04		 mov es:[di + 4], ax
+    232	0246  B0 29			 mov al, ')'
+    233	0248  26: 89 45	06		 mov es:[di + 6], ax
+    234	024C  B0 3D			 mov al, '='
+    235	024E  26: 89 45	08		 mov es:[di + 8], ax
+    236
+    237	0252  81 C7 00A0		 add di, 2 * CONS_WIDTH
+    238	0256  E2 DD			 loop dec_loop
+    239
+    240	0258  B4 0F			 mov ah, clr_white
+    241	025A  B9 0003			 mov cx, 3
+    242	025D  BF 0036			 mov di, (col_width * 2	+ 1) * 2
+    243	0260			     bin_loop:
+    244	0260  B0 28			 mov al, '('
+    245	0262  26: 89 05			 mov es:[di], ax
+    246	0265  B0 32			 mov al, '2'
+    247	0267  26: 89 45	02		 mov es:[di + 2], ax
+    248	026B  B0 29			 mov al, ')'
+    249	026D  26: 89 45	04		 mov es:[di + 4], ax
+    250	0271  B0 3D			 mov al, '='
+    251	0273  26: 89 45	06		 mov es:[di + 6], ax
+    252
+    253	0277  81 C7 00A0		 add di, 2 * CONS_WIDTH
+    254	027B  E2 E3			 loop bin_loop
+    255
+    256	027D  B4 0F			 mov ah, clr_white
+    257	027F  B9 0003			 mov cx, 3
+    258	0282  BF 0050			 mov di, (col_width * 3	+ 1) * 2
+    259	0285			     hex_loop:
+    260	0285  B0 28			 mov al, '('
+    261	0287  26: 89 05			 mov es:[di], ax
+    262	028A  B0 31			 mov al, '1'
+    263	028C  26: 89 45	02		 mov es:[di + 2], ax
+    264	0290  B0 36			 mov al, '6'
+    265	0292  26: 89 45	04		 mov es:[di + 4], ax
+    266	0296  B0 29			 mov al, ')'
+    267	0298  26: 89 45	06		 mov es:[di + 6], ax
+    268
+    269	029C  81 C7 00A0		 add di, 2 * CONS_WIDTH
+    270	02A0  E2 E3			 loop hex_loop
+    271
+    272	02A2  B8 4C00			 mov ax, 4c00h
+    273	02A5  CD 21			 int 21h
+    274
+    275	02A7			     .data
+    276	0000  31 32 33 24	     s_dec  db '123$'
+    277	0004  31 31 31 30 30 31	31+  s_bin  db '11100111$'
+    278	      31 24
+    279	000D  45 44 41 24	     s_hex  db 'EDA$'
+    280
+    281				     end start
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 6
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "02/25/19"
+??FILENAME			  Text	 "main	  "
+??TIME				  Text	 "18:31:15"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _DATA
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 MAIN
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+BIN_LOOP			  Near	 DGROUP:0260
+CLR_WHITE			  Number 000F
+COL_WIDTH			  Number 000D
+CONS_WIDTH			  Number 0050
+DEC_LOOP			  Near	 DGROUP:0235
+ENDLOO				  Near	 DGROUP:0135
+GETBIN				  Near	 DGROUP:---- Extern
+GETDEC				  Near	 DGROUP:---- Extern
+GETHEX				  Near	 DGROUP:---- Extern
+HEX_LOOP			  Near	 DGROUP:0285
+LAST_LINE			  Number 000E
+LOO				  Near	 DGROUP:0128
+MAKEFRAME			  Near	 DGROUP:---- Extern
+NOT_BIN				  Near	 DGROUP:0125
+NOT_DEC				  Near	 DGROUP:011B
+PRINTBIN			  Near	 DGROUP:---- Extern
+PRINTDEC			  Near	 DGROUP:---- Extern
+PRINTHEX			  Near	 DGROUP:---- Extern
+READY				  Near	 DGROUP:0128
+START				  Near	 DGROUP:0100
+S_BIN				  Byte	 DGROUP:0004
+S_DEC				  Byte	 DGROUP:0000
+S_HEX				  Byte	 DGROUP:000D
+VAR_CHECK			  Near	 DGROUP:---- Extern
+VIDEO_MEM			  Number B800
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0011 Word	  Public  DATA
+  _TEXT				  16  02A7 Word	  Public  CODE
+Turbo Assembler	 Version 4.1	    02/25/19 18:31:15	    Page 7
+Error Summary
+
+
+
+*Warning* main.asm(73) Argument	needs type override
+

@@ -816,6 +816,7 @@ endmsg:
 ;=================================================
     
 .data
+
 ax_ten     db 'So ax is 10$'
 ax_not_ten db 'Ax is not 10$'
 msg        db 'Some Yota ad.*$'
